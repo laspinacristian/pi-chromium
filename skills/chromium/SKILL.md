@@ -29,7 +29,7 @@ A Chromium browser you drive with one command, `{baseDir}/browser.js`. The windo
 - **Agent tab.** Every command acts on your tab: the one you opened or switched to, even if the user opens other tabs. When an action of yours opens a new tab (e.g. a `target=_blank` link), you are told and it becomes your tab. Do not close tabs the user opened unless asked.
 - **Logins.** Never ask for passwords or log in with credentials yourself. Ask the user to log in in the browser window (through noVNC), wait for their confirmation, then continue.
 - **Dialogs.** `alert`, `confirm`, `prompt` and leave-page dialogs block the page; commands report them (`⚠ JavaScript dialog opened …`). Answer with `dialog accept|dismiss` before continuing. Accept a `confirm` only when the action is what the user asked for.
-- **Leave the browser open** when you are done, so the user can see what you did. Close it with `stop` only when the user asks. The browser may already be open from an earlier task: your tab is kept, so run `tabs` to see where you are before navigating.
+- **Leave the browser open** when you are done, so the user can see what you did. Close it with `stop` only when the user asks.
 
 ## Commands in detail
 
