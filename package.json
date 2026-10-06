@@ -1,6 +1,6 @@
 {
   "name": "pi-chromium",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pi skill: a real Chromium browser for the agent, on a virtual display you watch and use through noVNC.",
   "type": "module",
   "license": "MIT",
