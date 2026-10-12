@@ -5,9 +5,8 @@
 #
 # Checks the dependencies, installs the skill with pi and sets up two systemd user services:
 #   pi-chromium-vdisplay the virtual display :99 Chromium runs on (Xvnc, VNC on localhost:5999)
-#   pi-chromium-novnc   the web page to watch and use that display (noVNC, port 6080)
-# The web page listens on all interfaces; NOVNC_LISTEN=127.0.0.1 keeps it on localhost only,
-# for example behind a reverse proxy.
+#   pi-chromium-novnc   the web page to watch and use that display (noVNC, on 127.0.0.1:6080)
+# The web page listens on localhost only: put it behind a reverse proxy that adds HTTPS.
 # No root needed: it does not install system packages, it tells you which ones are missing.
 # The VNC password goes in ~/.pi/agent/chromium ($PI_CODING_AGENT_DIR/chromium), next to
 # the browser profile.
@@ -17,7 +16,6 @@ SOURCE=git:github.com/laspinacristian/pi-chromium
 DISPLAY_NUM=99 # display :99, 1920x1080: the same values as skills/chromium/server.js
 SIZE=1920x1080
 PORT=6080
-LISTEN="${NOVNC_LISTEN:-0.0.0.0}" # address the noVNC web page listens on
 DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/chromium" # the same as skills/chromium/server.js
 PROFILE="$DIR/profile"
 UNITS="$HOME/.config/systemd/user"
@@ -102,7 +100,7 @@ if ! xauth list ":$DISPLAY_NUM" 2>/dev/null | grep -q .; then
 fi
 
 # noVNC's files, plus an entry page that opens it already configured, from any address
-# (directly on the port or behind a reverse proxy under a path such as /browser/)
+# (behind a reverse proxy, also under a path such as /browser/)
 mkdir -p "$WEB"
 for file in app core vendor vnc.html package.json; do
     if [[ -e "$NOVNC/$file" ]]; then ln -s "$NOVNC/$file" "$WEB/$file"; fi
@@ -133,7 +131,7 @@ cat > "$UNITS/pi-chromium-vdisplay.service" <<EOF
 Description=Virtual display :$DISPLAY_NUM for the Pi agent's Chromium (pi-chromium)
 
 [Service]
-ExecStart=$(command -v Xvnc) :$DISPLAY_NUM -geometry $SIZE -depth 24 -auth %h/.Xauthority -nolisten tcp -localhost -rfbport $((5900 + DISPLAY_NUM)) -SecurityTypes VncAuth -PasswordFile $DIR/vncpasswd -AlwaysShared -AcceptSetDesktopSize=0 -desktop pi-chromium
+ExecStart=$(command -v Xvnc) :$DISPLAY_NUM -geometry $SIZE -auth %h/.Xauthority -localhost -SecurityTypes VncAuth -PasswordFile $DIR/vncpasswd -AcceptSetDesktopSize=0
 Restart=on-failure
 RestartSec=5
 
@@ -149,7 +147,7 @@ Wants=pi-chromium-vdisplay.service
 After=pi-chromium-vdisplay.service
 
 [Service]
-ExecStart=$(command -v websockify) --web $WEB --file-only --heartbeat 30 $LISTEN:$PORT localhost:$((5900 + DISPLAY_NUM))
+ExecStart=$(command -v websockify) --web $WEB --heartbeat 30 127.0.0.1:$PORT localhost:$((5900 + DISPLAY_NUM))
 Restart=on-failure
 RestartSec=5
 
@@ -165,7 +163,7 @@ for unit in pi-chromium-vdisplay pi-chromium-novnc; do
 done
 
 echo
-echo "Installed. Watch and use the browser at http://$(hostname):$PORT/"
+echo "Installed. noVNC listens on 127.0.0.1:$PORT: put it behind a reverse proxy that adds HTTPS."
 if [[ -n "$password" ]]; then
     echo "VNC password: $password"
 fi

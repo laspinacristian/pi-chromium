@@ -22,13 +22,7 @@ sudo apt install chromium tigervnc-standalone-server tigervnc-tools novnc websoc
 curl -fsSL https://raw.githubusercontent.com/laspinacristian/pi-chromium/main/install.sh | bash
 ```
 
-Then open `http://<server>:6080/` with the VNC password the installer prints. To change it: `vncpasswd ~/.pi/agent/chromium/vncpasswd`.
-
-The page listens on all interfaces. To keep it on localhost only, for example behind a reverse proxy that adds HTTPS:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/laspinacristian/pi-chromium/main/install.sh | NOVNC_LISTEN=127.0.0.1 bash
-```
+noVNC listens on `127.0.0.1:6080`: put it behind a reverse proxy that adds HTTPS, also under a path such as `/browser/`. It asks for the VNC password the installer prints. To change it: `vncpasswd ~/.pi/agent/chromium/vncpasswd`.
 
 Run the same command again to update.
 
