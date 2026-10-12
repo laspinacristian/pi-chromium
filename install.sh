@@ -6,6 +6,8 @@
 # Checks the dependencies, installs the skill with pi and sets up two systemd user services:
 #   pi-chromium-vdisplay the virtual display :99 Chromium runs on (Xvnc, VNC on localhost:5999)
 #   pi-chromium-novnc   the web page to watch and use that display (noVNC, port 6080)
+# The web page listens on all interfaces; NOVNC_LISTEN=127.0.0.1 keeps it on localhost only,
+# for example behind a reverse proxy.
 # No root needed: it does not install system packages, it tells you which ones are missing.
 # The VNC password goes in ~/.pi/agent/chromium ($PI_CODING_AGENT_DIR/chromium), next to
 # the browser profile.
@@ -15,6 +17,7 @@ SOURCE=git:github.com/laspinacristian/pi-chromium
 DISPLAY_NUM=99 # display :99, 1920x1080: the same values as skills/chromium/server.js
 SIZE=1920x1080
 PORT=6080
+LISTEN="${NOVNC_LISTEN:-0.0.0.0}" # address the noVNC web page listens on
 DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/chromium" # the same as skills/chromium/server.js
 PROFILE="$DIR/profile"
 UNITS="$HOME/.config/systemd/user"
@@ -146,7 +149,7 @@ Wants=pi-chromium-vdisplay.service
 After=pi-chromium-vdisplay.service
 
 [Service]
-ExecStart=$(command -v websockify) --web $WEB --file-only --heartbeat 30 0.0.0.0:$PORT localhost:$((5900 + DISPLAY_NUM))
+ExecStart=$(command -v websockify) --web $WEB --file-only --heartbeat 30 $LISTEN:$PORT localhost:$((5900 + DISPLAY_NUM))
 Restart=on-failure
 RestartSec=5
 
