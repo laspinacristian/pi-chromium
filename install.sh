@@ -19,7 +19,6 @@ PORT=6080
 DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/chromium" # the same as skills/chromium/server.js
 PROFILE="$DIR/profile"
 UNITS="$HOME/.config/systemd/user"
-WEB="$HOME/.local/share/pi-chromium/novnc"
 
 die() { echo "Error: $*" >&2; exit 1; }
 
@@ -30,13 +29,13 @@ stop_services() {
     systemctl --user disable --now pi-chromium-novnc.service pi-chromium-vdisplay.service 2>/dev/null || true
     rm -f "$UNITS/pi-chromium-vdisplay.service" "$UNITS/pi-chromium-novnc.service"
     systemctl --user daemon-reload
-    rm -rf "$WEB"
+    rm -rf "$HOME/.local/share/pi-chromium" # the entry page of 1.1.0 and earlier
 }
 
 case "${1:-}" in
     --uninstall)
         stop_services
-        rm -rf "$DIR/vncpasswd" "$HOME/.local/share/pi-chromium"
+        rm -rf "$DIR/vncpasswd"
         xauth remove ":$DISPLAY_NUM" 2>/dev/null || true
         if command -v pi >/dev/null; then pi remove "$SOURCE" || true; fi
         if [[ "${2:-}" == --purge ]]; then
@@ -99,30 +98,6 @@ if ! xauth list ":$DISPLAY_NUM" 2>/dev/null | grep -q .; then
     xauth add ":$DISPLAY_NUM" . "$(mcookie)"
 fi
 
-# noVNC's files, plus an entry page that opens it already configured, from any address
-# (behind a reverse proxy, also under a path such as /browser/)
-mkdir -p "$WEB"
-for file in app core vendor vnc.html package.json; do
-    if [[ -e "$NOVNC/$file" ]]; then ln -s "$NOVNC/$file" "$WEB/$file"; fi
-done
-cat > "$WEB/index.html" <<'EOF'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>pi-chromium</title>
-<script>
-  // noVNC wants the WebSocket path without the leading "/". Settings go after the #,
-  // so that noVNC does not save them in the site's localStorage.
-  const dir = location.pathname.replace(/[^/]*$/, "");
-  const settings = new URLSearchParams({ path: dir.slice(1) + "websockify", autoconnect: "1", resize: "scale", reconnect: "1" });
-  location.replace("vnc.html#" + settings);
-</script>
-</head>
-<body></body>
-</html>
-EOF
-
 mkdir -p "$UNITS"
 cat > "$UNITS/pi-chromium-vdisplay.service" <<EOF
 # Installed by pi-chromium (install.sh). Virtual display :$DISPLAY_NUM the agent's Chromium runs on,
@@ -147,7 +122,7 @@ Wants=pi-chromium-vdisplay.service
 After=pi-chromium-vdisplay.service
 
 [Service]
-ExecStart=$(command -v websockify) --web $WEB --heartbeat 30 127.0.0.1:$PORT localhost:$((5900 + DISPLAY_NUM))
+ExecStart=$(command -v websockify) --web $NOVNC --heartbeat 30 127.0.0.1:$PORT localhost:$((5900 + DISPLAY_NUM))
 Restart=on-failure
 RestartSec=5
 

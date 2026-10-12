@@ -22,7 +22,17 @@ sudo apt install chromium tigervnc-standalone-server tigervnc-tools novnc websoc
 curl -fsSL https://raw.githubusercontent.com/laspinacristian/pi-chromium/main/install.sh | bash
 ```
 
-noVNC listens on `127.0.0.1:6080`: put it behind a reverse proxy that adds HTTPS, also under a path such as `/browser/`. It asks for the VNC password the installer prints. To change it: `vncpasswd ~/.pi/agent/chromium/vncpasswd`.
+noVNC listens on `127.0.0.1:6080`: put it behind a reverse proxy that adds HTTPS and open `vnc.html`. It asks for the VNC password the installer prints. To change it: `vncpasswd ~/.pi/agent/chromium/vncpasswd`.
+
+noVNC reads its settings from the URL. With [Caddy](https://caddyserver.com), under `/browser/`, already connected and scaled to the window:
+
+```caddyfile
+@browser path /browser /browser/
+redir @browser /browser/vnc.html#autoconnect=true&resize=scale&reconnect=true&path=browser/websockify
+handle_path /browser/* {
+	reverse_proxy 127.0.0.1:6080
+}
+```
 
 Run the same command again to update.
 
