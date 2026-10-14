@@ -6,10 +6,9 @@
 # Checks the dependencies, installs the skill with pi and sets up two systemd user services:
 #   pi-chromium-vdisplay the virtual display :99 Chromium runs on (Xvnc, VNC on localhost:5999)
 #   pi-chromium-novnc   the web page to watch and use that display (noVNC, on 127.0.0.1:6080)
-# The web page listens on localhost only: put it behind a reverse proxy that adds HTTPS.
+# The web page listens on localhost only and has no password of its own: put it behind a
+# reverse proxy that adds HTTPS and authentication.
 # No root needed: it does not install system packages, it tells you which ones are missing.
-# The VNC password goes in ~/.pi/agent/chromium ($PI_CODING_AGENT_DIR/chromium), next to
-# the browser profile.
 set -euo pipefail
 
 SOURCE=git:github.com/laspinacristian/pi-chromium
@@ -35,7 +34,6 @@ stop_services() {
 case "${1:-}" in
     --uninstall)
         stop_services
-        rm -rf "$DIR/vncpasswd"
         xauth remove ":$DISPLAY_NUM" 2>/dev/null || true
         if command -v pi >/dev/null; then pi remove "$SOURCE" || true; fi
         if [[ "${2:-}" == --purge ]]; then
@@ -60,7 +58,7 @@ find_novnc() {
 }
 
 missing=()
-for cmd in pi node systemctl Xvnc vncpasswd websockify xauth mcookie scrot; do
+for cmd in pi node systemctl Xvnc websockify xauth mcookie scrot; do
     command -v "$cmd" >/dev/null || missing+=("$cmd")
 done
 command -v chromium-browser >/dev/null || command -v chromium >/dev/null || missing+=(chromium)
@@ -84,14 +82,8 @@ fi
 
 stop_services
 
-# VNC password, only the first time (VNC uses at most 8 characters)
 mkdir -p "$DIR"
-password=
-if [[ ! -s "$DIR/vncpasswd" ]]; then
-    cookie=$(mcookie)
-    password=${cookie:0:8}
-    (umask 077; printf '%s\n' "$password" | vncpasswd -f > "$DIR/vncpasswd")
-fi
+rm -f "$DIR/vncpasswd" # 1.1.1 and earlier
 
 # X11 cookie for the display in ~/.Xauthority: only this user's programs can use it
 if ! xauth list ":$DISPLAY_NUM" 2>/dev/null | grep -q .; then
@@ -101,12 +93,12 @@ fi
 mkdir -p "$UNITS"
 cat > "$UNITS/pi-chromium-vdisplay.service" <<EOF
 # Installed by pi-chromium (install.sh). Virtual display :$DISPLAY_NUM the agent's Chromium runs on,
-# with a VNC server on localhost:$((5900 + DISPLAY_NUM)) (password in $DIR/vncpasswd).
+# with a VNC server on localhost:$((5900 + DISPLAY_NUM)), no password: only local programs reach it.
 [Unit]
 Description=Virtual display :$DISPLAY_NUM for the Pi agent's Chromium (pi-chromium)
 
 [Service]
-ExecStart=$(command -v Xvnc) :$DISPLAY_NUM -geometry $SIZE -auth %h/.Xauthority -localhost -SecurityTypes VncAuth -PasswordFile $DIR/vncpasswd -AcceptSetDesktopSize=0
+ExecStart=$(command -v Xvnc) :$DISPLAY_NUM -geometry $SIZE -auth %h/.Xauthority -localhost -SecurityTypes None -AcceptSetDesktopSize=0
 Restart=on-failure
 RestartSec=5
 
@@ -115,7 +107,7 @@ WantedBy=default.target
 EOF
 cat > "$UNITS/pi-chromium-novnc.service" <<EOF
 # Installed by pi-chromium (install.sh). Web page (noVNC) to watch and use the display of
-# pi-chromium-vdisplay from a browser, on port $PORT. It asks for the VNC password.
+# pi-chromium-vdisplay from a browser, on port $PORT. No password: the reverse proxy must add one.
 [Unit]
 Description=noVNC for the Pi agent's Chromium (pi-chromium)
 Wants=pi-chromium-vdisplay.service
@@ -138,11 +130,7 @@ for unit in pi-chromium-vdisplay pi-chromium-novnc; do
 done
 
 echo
-echo "Installed. noVNC listens on 127.0.0.1:$PORT: put it behind a reverse proxy that adds HTTPS."
-if [[ -n "$password" ]]; then
-    echo "VNC password: $password"
-fi
-echo "Change the VNC password with: vncpasswd $DIR/vncpasswd"
+echo "Installed. noVNC listens on 127.0.0.1:$PORT with no password: put it behind a reverse proxy that adds HTTPS and authentication."
 if [[ "$(loginctl show-user "$USER" -p Linger --value 2>/dev/null)" != yes ]]; then
     echo "Note: the services start when you log in. To start them at boot: loginctl enable-linger"
 fi
